@@ -1,23 +1,3 @@
-test_data <- function() {
-  x1 <- rep(c(0, 1), 6)
-  x2 <- seq(-1.5, 1.5, length.out = 12)
-  data.frame(
-    y = 1 + 0.5 * x1 + sin(x2) + c(0.2, -0.1, 0.05, 0.3, -0.2, 0.15,
-                                   -0.05, 0.1, -0.15, 0.25, -0.3, 0.05),
-    x1 = x1,
-    x2 = x2,
-    group = factor(rep(c("a", "b", "c"), 4)),
-    vardir = rep(0.5, 12)
-  )
-}
-
-small_control <- function(...) {
-  utils::modifyList(
-    list(n_iter = 4, burn_in = 1, progress = FALSE),
-    list(...)
-  )
-}
-
 test_that("formula interface works for the linear Fay-Herriot model", {
   dat <- test_data()
   fit <- fit_fh(
@@ -149,6 +129,27 @@ test_that("y dot formula excludes explicit sampling variance column", {
   expect_true("groupb" %in% fit$model_matrix_colnames)
   expect_true("groupc" %in% fit$model_matrix_colnames)
   expect_identical(fit$sampling_variance_name, "vardir")
+})
+
+test_that("y dot formula excludes variables used in sampling variance expressions", {
+  dat <- test_data()
+  dat$MedIncSE <- sqrt(dat$vardir)
+  dat$vardir <- NULL
+
+  fit <- fit_fh(
+    y ~ .,
+    sampling_variance = MedIncSE^2,
+    data = dat,
+    method = "linear",
+    control = small_control()
+  )
+
+  expect_false("MedIncSE" %in% fit$model_matrix_colnames)
+  expect_identical(fit$sampling_variance_name, "MedIncSE")
+  expect_identical(
+    fit$model_matrix_colnames,
+    colnames(model.matrix(y ~ . - MedIncSE, dat))
+  )
 })
 
 test_that("factor predictors use model.matrix encoding", {

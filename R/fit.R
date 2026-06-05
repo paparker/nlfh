@@ -107,7 +107,7 @@ fit_fh <- function(y = NULL, x = NULL, sampling_variance = NULL,
   defaults <- switch(
     method,
     linear = list(
-      prior_beta_variance = 1000,
+      prior_beta_variance = 10000^2,
       n_iter = 1000,
       burn_in = 500,
       progress = TRUE

@@ -150,6 +150,10 @@ parse_fh_inputs <- function(formula = NULL, data = NULL, y = NULL, x = NULL,
   if (is.null(data) || is.null(sampling_variance_expr)) {
     return(NULL)
   }
+  referenced_names <- intersect(all.vars(sampling_variance_expr), names(data))
+  if (length(referenced_names) > 0L) {
+    return(referenced_names)
+  }
   if (is.symbol(sampling_variance_expr)) {
     name <- as.character(sampling_variance_expr)
     if (name %in% names(data)) {

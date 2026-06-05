@@ -12,13 +12,13 @@ fit_fh_linear(
   formula = NULL,
   data = NULL,
   X = NULL,
-  prior_beta_variance = 1000,
+  prior_beta_variance = 10000^2,
   n_iter = 1000,
   burn_in = 500,
   progress = TRUE
 )
 
-FH_Fit(Y, X, S2, sig2b = 1000, iter = 1000, burn = 500)
+FH_Fit(Y, X, S2, sig2b = 10000^2, iter = 1000, burn = 500)
 }
 \arguments{
 \item{y}{Numeric vector of area-level direct estimates for the matrix
