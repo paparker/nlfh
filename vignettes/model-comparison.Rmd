@@ -43,6 +43,13 @@ fit_control <- list(
 The linear model is the standard area-level Fay-Herriot model. The RNN and BART
 models use the same predictors, but estimate a nonlinear mean function. The RNN
 fit follows Parker (2024), and the BART-FH fit follows Parker and Eideh (2026).
+For nonlinear workflows, inspect the scale and coding of the covariates before
+fitting. Formula inputs are expanded with `model.matrix()`, so factors are
+converted to contrast columns. The RNN method centers and scales non-intercept
+covariates by default; use `control = list(scale = FALSE)` to disable this.
+It also standardizes the response and sampling variances internally, with
+posterior summaries returned on the original response scale.
+For matrix inputs, apply any desired factor encoding before calling `fit_fh()`.
 
 ```{r fit-models}
 set.seed(1)
@@ -151,6 +158,67 @@ component. The same information is available from `fitted(..., full = TRUE)`.
 ```{r area-summaries}
 area_summary <- fitted(fit_bart, full = TRUE)
 knitr::kable(head(area_summary, 8), digits = 2)
+```
+
+The retained posterior draws also support direct visual comparison of area-level
+estimates across models. The plot below shows posterior means and 95% credible
+intervals for the first 12 areas.
+
+```{r model-interval-plot, fig.height = 5}
+interval_fits <- list(
+  Linear = fit_linear,
+  RNN = fit_rnn,
+  BART = fit_bart
+)
+plot_areas <- seq_len(12)
+model_offsets <- c(-0.22, 0, 0.22)
+model_cols <- c("#1f5f99", "#7c3aed", "#b45309")
+
+interval_summaries <- lapply(interval_fits, fitted, full = TRUE)
+mean_range <- range(
+  unlist(lapply(interval_summaries, function(x) {
+    c(x$q2.5[plot_areas], x$q97.5[plot_areas])
+  })),
+  na.rm = TRUE
+)
+
+plot(
+  NA,
+  xlim = c(0.5, length(plot_areas) + 0.5),
+  ylim = mean_range,
+  xaxt = "n",
+  xlab = "Area",
+  ylab = "Posterior estimate of theta"
+)
+axis(1, at = plot_areas, labels = plot_areas)
+
+for (i in seq_along(interval_summaries)) {
+  out <- interval_summaries[[i]][plot_areas, ]
+  x_pos <- plot_areas + model_offsets[i]
+  segments(
+    x0 = x_pos,
+    y0 = out$q2.5,
+    x1 = x_pos,
+    y1 = out$q97.5,
+    col = model_cols[i],
+    lwd = 2
+  )
+  points(
+    x_pos,
+    out$mean,
+    pch = 19,
+    col = model_cols[i]
+  )
+}
+
+legend(
+  "topright",
+  legend = names(interval_fits),
+  col = model_cols,
+  pch = 19,
+  lwd = 2,
+  bty = "n"
+)
 ```
 
 The posterior mean estimates can be compared with the direct estimates and their

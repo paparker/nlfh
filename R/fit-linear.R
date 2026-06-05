@@ -1,8 +1,7 @@
 #' Fit a Linear Fay-Herriot Model
 #'
 #' Fits the basic Bayesian Fay-Herriot model with a linear mean function and
-#' area-level random effects. The sampling model, priors, and MCMC updates match
-#' the original `FH_Fit()` implementation.
+#' area-level random effects.
 #'
 #' @param formula Optional model formula such as `y ~ x1 + x2`. The formula
 #'   interface requires `data`.
@@ -18,13 +17,16 @@
 #'   `data` or a length-one character string naming a column in `data`.
 #' @param prior_beta_variance Positive scalar prior variance for the regression
 #'   coefficients.
+#' @param prior_shape Non-negative scalar shape parameter for the inverse-gamma
+#'   prior on the random-effect variance.
+#' @param prior_rate Non-negative scalar rate parameter for the inverse-gamma
+#'   prior on the random-effect variance.
 #' @param n_iter Positive integer number of MCMC iterations.
 #' @param burn_in Positive integer number of initial MCMC iterations to discard.
+#' @param scale Logical; if `TRUE`, center and scale non-intercept covariates
+#'   before fitting. Intercept columns named `(Intercept)`, `Intercept`, or
+#'   `intercept` are not scaled.
 #' @param progress Logical; if `TRUE`, display a progress bar.
-#' @param Y,S2 Legacy argument names for `y` and `sampling_variance`.
-#' @param sig2b Legacy argument name for `prior_beta_variance`.
-#' @param iter,burn Legacy argument names for `n_iter` and `burn_in`.
-#'
 #' @return An object of class `nlfh_linear_fit` and `nlfh_fit`, a list with
 #'   posterior draws for `predictions`, `random_effect_variance`, `coefficients`,
 #'   `mean`, the scalar `dic`, and MCMC metadata.
@@ -34,7 +36,7 @@
 #' [stats::model.matrix()]. Factors are expanded using R's standard contrast and
 #' dummy-variable rules. An intercept is included when the formula includes one,
 #' which is the default; matrix inputs are used as supplied.
-#' @noRd
+#' @export
 #'
 #' @examples
 #' data(acs_dat)
@@ -50,8 +52,10 @@
 #' summary(fit)
 fit_fh_linear <- function(y = NULL, x = NULL, sampling_variance = NULL,
                           formula = NULL, data = NULL, X = NULL,
-                          prior_beta_variance = 10000^2, n_iter = 1000,
-                          burn_in = 500, progress = TRUE) {
+                          prior_beta_variance = 10000^2,
+                          prior_shape = 0.1, prior_rate = 0.1,
+                          n_iter = 1000, burn_in = 500,
+                          scale = FALSE, progress = TRUE) {
   input <- parse_fh_inputs(
     formula = formula,
     data = data,
@@ -63,6 +67,7 @@ fit_fh_linear <- function(y = NULL, x = NULL, sampling_variance = NULL,
     },
     env = parent.frame()
   )
+  input <- .scale_fh_inputs(input, scale, baseline = "intercept")
   y <- input$y
   x <- input$X
   sampling_variance <- input$vardir
@@ -70,6 +75,8 @@ fit_fh_linear <- function(y = NULL, x = NULL, sampling_variance = NULL,
     prior_beta_variance,
     "prior_beta_variance"
   )
+  prior_shape <- .validate_nonnegative_scalar(prior_shape, "prior_shape")
+  prior_rate <- .validate_nonnegative_scalar(prior_rate, "prior_rate")
   mcmc <- .validate_mcmc(n_iter, burn_in)
   n_iter <- mcmc$n_iter
   burn_in <- mcmc$burn_in
@@ -112,8 +119,8 @@ fit_fh_linear <- function(y = NULL, x = NULL, sampling_variance = NULL,
 
     tau2 <- tau2_out[i] <- 1 / stats::rgamma(
       1,
-      0.1 + n / 2,
-      0.1 + t(theta - x %*% beta1) %*% (theta - x %*% beta1) / 2
+      prior_shape + n / 2,
+      prior_rate + t(theta - x %*% beta1) %*% (theta - x %*% beta1) / 2
     )
     ll[i] <- -2 * sum(stats::dnorm(
       y,
@@ -154,16 +161,5 @@ fit_fh_linear <- function(y = NULL, x = NULL, sampling_variance = NULL,
       .fh_fit_metadata(input)
     ),
     "nlfh_linear_fit"
-  )
-}
-
-FH_Fit <- function(Y, X, S2, sig2b = 10000^2, iter = 1000, burn = 500) {
-  fit_fh_linear(
-    y = Y,
-    X = X,
-    sampling_variance = S2,
-    prior_beta_variance = sig2b,
-    n_iter = iter,
-    burn_in = burn
   )
 }

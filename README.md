@@ -48,44 +48,48 @@ summary(fit_linear)
 #> <summary.nlfh_fit>
 #> Model type: linear Fay-Herriot
 #> Formula: MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian
-#> DIC: 14154
+#> DIC: 14156
 #> 
 #> MCMC:
 #>  n_iter burn_in posterior_draws areas
 #>     500     250             250   500
 #> 
 #> Details:
-#>  retained_draws burn_in_fraction progress
-#>             250              0.5    FALSE
+#>  retained_draws burn_in_fraction progress scale
+#>             250              0.5    FALSE FALSE
 #> 
 #> Variance parameters:
-#>               parameter   mean     sd median   q2.5  q97.5
-#>  random_effect_variance 0.3876 0.2155 0.3202 0.1183 0.9157
+#>               parameter mean     sd median q2.5 q97.5
+#>  random_effect_variance 1.97 0.3603  1.911 1.35 2.731
 #> 
 #> Coefficients:
 #>    parameter    mean   sd  median    q2.5   q97.5
-#>  (Intercept)  104700 4432  105000   95720  113500
-#>     SNAPRate  -66560 3114  -66570  -72100  -59940
-#>      PovRate -139800 2006 -139900 -143800 -135800
-#>        White   -1505 4419   -1402   -9874    6982
-#>        Black  -10740 4320  -10500  -19040   -2147
-#>     Hispanic    4918 5566    5181   -5800   14970
+#>  (Intercept)  104700 4459  104600   96920  113600
+#>     SNAPRate  -66270 3246  -66140  -72070  -59540
+#>      PovRate -139700 2156 -139700 -143400 -135000
+#>        White   -1647 4544   -1523  -10740    6418
+#>        Black  -10860 4496  -10800  -20080   -2823
+#>     Hispanic    5126 5913    4918   -6132   16730
 #> ... 1 more rows
 #> 
 #> Area-level estimates theta_i:
 #>  area  mean    sd median  q2.5 q97.5
-#>     1 43720 280.6  43720 43190 44270
-#>     2 30210 441.9  30210 29470 31020
-#>     3 44310 635.2  44270 43110 45620
-#>     4 61840 271.8  61820 61330 62360
-#>     5 64310 278.1  64300 63790 64860
-#>     6 40630 350.7  40640 39970 41280
+#>     1 43730 274.0  43730 43170 44310
+#>     2 30240 442.7  30270 29370 31070
+#>     3 44360 642.6  44360 43110 45660
+#>     4 61810 266.7  61810 61260 62340
+#>     5 64280 272.1  64290 63670 64780
+#>     6 40650 359.5  40640 39940 41340
 #> ... 494 more rows
 ```
 
 The formula interface specifies the available predictors. For nonlinear
 methods, it does not impose an additive linear mean structure; the model
-estimates an unknown function of the model matrix.
+estimates an unknown function of the model matrix. By default, the RNN
+model centers and scales non-intercept covariates before fitting; use
+`control = list(scale = FALSE)` to disable this covariate preprocessing.
+The RNN response and sampling variances are standardized internally and
+returned on the original response scale.
 
 ``` r
 fit_rnn <- fit_fh(
@@ -106,13 +110,13 @@ fit_bart <- fit_fh(
 
 c(linear = fit_linear$dic, rnn = fit_rnn$dic, bart = fit_bart$dic)
 #>   linear      rnn     bart 
-#> 14154.20 11669.31 11696.77
+#> 14155.66 10535.90 11782.53
 ```
 
 ``` r
 fit_bart$variable_importance
 #>  SNAPRate   PovRate     White 
-#> 0.3054538 0.3853294 0.3092167
+#> 0.3155422 0.3835334 0.3009243
 ```
 
 For BART fits, the first model-matrix column is treated as a

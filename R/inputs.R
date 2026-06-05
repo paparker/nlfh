@@ -215,6 +215,58 @@ parse_fh_inputs <- function(formula = NULL, data = NULL, y = NULL, x = NULL,
     predictor_names = input$predictor_names,
     has_intercept = input$has_intercept,
     sampling_variance_name = input$sampling_variance_name,
-    interface = input$interface
+    interface = input$interface,
+    scale = input$scale %||% FALSE,
+    covariate_center = input$covariate_center,
+    covariate_scale = input$covariate_scale
   )
+}
+
+.scale_fh_inputs <- function(input, scale, baseline = c("intercept", "first")) {
+  scale <- .validate_logical_scalar(scale, "scale")
+  baseline <- match.arg(baseline)
+
+  input$scale <- scale
+  input$covariate_center <- NULL
+  input$covariate_scale <- NULL
+  if (!scale) {
+    return(input)
+  }
+
+  scale_cols <- .scale_covariate_columns(input, baseline)
+  if (length(scale_cols) == 0L) {
+    return(input)
+  }
+
+  x <- input$X
+  centers <- colMeans(x[, scale_cols, drop = FALSE])
+  scales <- apply(x[, scale_cols, drop = FALSE], 2L, stats::sd)
+  scales[!is.finite(scales) | scales == 0] <- 1
+  x[, scale_cols] <- base::scale(
+    x[, scale_cols, drop = FALSE],
+    center = centers,
+    scale = scales
+  )
+
+  input$X <- x
+  input$covariate_center <- centers
+  input$covariate_scale <- scales
+  input
+}
+
+.scale_covariate_columns <- function(input, baseline) {
+  cols <- seq_len(ncol(input$X))
+  if (baseline == "first") {
+    return(setdiff(cols, 1L))
+  }
+
+  intercept_cols <- which(
+    colnames(input$X) %in% c("(Intercept)", "Intercept", "intercept")
+  )
+  if (length(intercept_cols) == 0L &&
+      identical(input$interface, "formula") &&
+      isTRUE(input$has_intercept)) {
+    intercept_cols <- 1L
+  }
+  setdiff(cols, intercept_cols)
 }

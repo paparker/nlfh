@@ -1,8 +1,7 @@
 #' Fit a BART Fay-Herriot Model
 #'
 #' Fits a Bayesian Fay-Herriot model whose mean function is represented with
-#' Bayesian additive regression trees via the `dbarts` package. The sampling
-#' model, priors, and MCMC updates match the original `BARTFH()` implementation.
+#' Bayesian additive regression trees via the `dbarts` package.
 #'
 #' @param formula Optional model formula such as `y ~ x1 + x2`. For nonlinear
 #'   models, the formula specifies the predictors available to the model; it
@@ -27,13 +26,9 @@
 #' @param n_bart_samples Positive integer number of BART samples to draw per
 #'   outer MCMC iteration.
 #' @param n_trees Positive integer number of trees used by `dbarts`.
+#' @param scale Logical; if `TRUE`, center and scale covariates after the first
+#'   baseline/intercept column before fitting. The first column is never scaled.
 #' @param progress Logical; if `TRUE`, display a progress bar.
-#' @param D Legacy argument name for `sampling_variance`.
-#' @param a,b Legacy argument names for `prior_shape` and `prior_rate`.
-#' @param n.iter,n.burn Legacy argument names for `n_iter` and `burn_in`.
-#' @param n.bart.samples Legacy argument name for `n_bart_samples`.
-#' @param n.tree Legacy argument name for `n_trees`.
-#'
 #' @return An object of class `nlfh_bart_fit` and `nlfh_fit`, a list with
 #'   posterior draws for `predictions`, the BART mean function `mean`, random effects
 #'   `random_effects`, random-effect variance `random_effect_variance`,
@@ -47,16 +42,18 @@
 #' @details
 #' Formula inputs are parsed with [stats::model.frame()] and
 #' [stats::model.matrix()]. Factors are expanded using R's standard contrast and
-#' dummy-variable rules. An intercept is included when the formula includes one,
-#' which is the default; matrix inputs are used as supplied. For this nonlinear
-#' method, the formula specifies the available predictors and does not impose an
-#' additive linear mean structure. The BART mean component estimates an unknown
-#' function `f(X)`. The first model-matrix column is treated as a
-#' baseline/intercept column. With the formula interface this is usually the
-#' default `(Intercept)` column; with the matrix interface, put the baseline or
+#' dummy-variable rules. Formula inputs must include an intercept, which is the
+#' default. For this nonlinear method, the formula specifies the available
+#' predictors and does not impose an additive linear mean structure. The BART
+#' mean component estimates an unknown function `f(X)`.
+#'
+#' The first model-matrix column is treated as a baseline/intercept column and
+#' is excluded from BART splitting variables. With the formula interface this is
+#' the default `(Intercept)` column; formulas that omit the intercept with `0 +`
+#' or `- 1` are rejected. With the matrix interface, put the baseline or
 #' intercept column first. BART variable importance is computed only for the
 #' remaining columns.
-#' @noRd
+#' @export
 #'
 #' @examples
 #' data(acs_dat)
@@ -75,7 +72,7 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
                         formula = NULL, data = NULL, X = NULL,
                         prior_shape = 0.01, prior_rate = 0.01,
                         n_iter = 1000, burn_in = 500, n_bart_samples = 10,
-                        n_trees = 50, progress = TRUE) {
+                        n_trees = 50, scale = FALSE, progress = TRUE) {
   input <- parse_fh_inputs(
     formula = formula,
     data = data,
@@ -87,9 +84,11 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
     },
     env = parent.frame()
   )
+  input <- .scale_fh_inputs(input, scale, baseline = "first")
   y <- input$y
   x <- input$X
   sampling_variance <- input$vardir
+  .validate_bart_formula_baseline(input, "bart")
   bart_x <- .bart_covariate_matrix(x)
   prior_shape <- .validate_nonnegative_scalar(prior_shape, "prior_shape")
   prior_rate <- .validate_nonnegative_scalar(prior_rate, "prior_rate")
@@ -217,21 +216,6 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
   )
 }
 
-BARTFH <- function(y, x, D, a = 0.01, b = 0.01, n.iter = 1000,
-                   n.burn = 500, n.bart.samples = 10, n.tree = 50) {
-  fit_fh_bart(
-    y = y,
-    x = x,
-    sampling_variance = D,
-    prior_shape = a,
-    prior_rate = b,
-    n_iter = n.iter,
-    burn_in = n.burn,
-    n_bart_samples = n.bart.samples,
-    n_trees = n.tree
-  )
-}
-
 .bart_covariate_matrix <- function(x) {
   if (ncol(x) < 2L) {
     stop(
@@ -241,4 +225,16 @@ BARTFH <- function(y, x, D, a = 0.01, b = 0.01, n.iter = 1000,
     )
   }
   x[, -1L, drop = FALSE]
+}
+
+.validate_bart_formula_baseline <- function(input, method) {
+  if (method == "bart" && input$interface == "formula" && !input$has_intercept) {
+    stop(
+      "`method = \"bart\"` requires a formula intercept. ",
+      "Use a formula with an intercept, or use the matrix interface with the ",
+      "baseline/intercept column first.",
+      call. = FALSE
+    )
+  }
+  invisible(NULL)
 }

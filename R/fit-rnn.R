@@ -2,8 +2,7 @@
 #'
 #' Fits a Bayesian Fay-Herriot model whose mean function is represented by a
 #' fixed random hidden layer with logistic activation and sampled output-layer
-#' coefficients. The sampling model, priors, and MCMC updates match the original
-#' `FH_RNN_Fit()` implementation.
+#' coefficients.
 #'
 #' @param formula Optional model formula such as `y ~ x1 + x2`. For nonlinear
 #'   models, the formula specifies the predictors available to the model; it
@@ -20,13 +19,19 @@
 #'   `data` or a length-one character string naming a column in `data`.
 #' @param n_hidden Positive integer number of hidden nodes in the random-weight
 #'   neural network.
+#' @param prior_beta_variance Optional positive scalar prior variance for the
+#'   output-layer coefficients. When `NULL`, the coefficient variance is sampled
+#'   with the original inverse-gamma update.
+#' @param prior_shape Non-negative scalar shape parameter for the inverse-gamma
+#'   prior on the random-effect variance.
+#' @param prior_rate Non-negative scalar rate parameter for the inverse-gamma
+#'   prior on the random-effect variance.
 #' @param n_iter Positive integer number of MCMC iterations.
 #' @param burn_in Positive integer number of initial MCMC iterations to discard.
+#' @param scale Logical; if `TRUE`, center and scale non-intercept covariates
+#'   before fitting. Intercept columns named `(Intercept)`, `Intercept`, or
+#'   `intercept` are not scaled.
 #' @param progress Logical; if `TRUE`, display a progress bar.
-#' @param Y,S2 Legacy argument names for `y` and `sampling_variance`.
-#' @param nh Legacy argument name for `n_hidden`.
-#' @param iter,burn Legacy argument names for `n_iter` and `burn_in`.
-#'
 #' @return An object of class `nlfh_rnn_fit` and `nlfh_fit`, a list with
 #'   posterior draws for `predictions`, `random_effect_variance`,
 #'   `coefficient_variance`, hidden-layer `coefficients`, `mean`, the scalar
@@ -45,7 +50,12 @@
 #' method, the formula specifies the available predictors and does not impose an
 #' additive linear mean structure. The model estimates an unknown function
 #' `f(X)`.
-#' @noRd
+#'
+#' The response and sampling variances are standardized internally before
+#' fitting the RNN. Posterior predictions, mean function draws, coefficients,
+#' random-effect variances, and DIC are transformed back to the original
+#' response scale before being returned.
+#' @export
 #'
 #' @examples
 #' data(acs_dat)
@@ -61,7 +71,9 @@
 #' summary(fit)
 fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
                        formula = NULL, data = NULL, X = NULL,
-                       n_hidden = 200, n_iter = 1000, burn_in = 500,
+                       n_hidden = 200, prior_beta_variance = NULL,
+                       prior_shape = 0.1, prior_rate = 0.1,
+                       n_iter = 1000, burn_in = 500, scale = TRUE,
                        progress = TRUE) {
   input <- parse_fh_inputs(
     formula = formula,
@@ -74,10 +86,26 @@ fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
     },
     env = parent.frame()
   )
-  y <- input$y
+  input <- .scale_fh_inputs(input, scale, baseline = "intercept")
+  y_original <- input$y
   x <- input$X
-  sampling_variance <- input$vardir
+  sampling_variance_original <- input$vardir
+  response_center <- mean(y_original)
+  response_scale <- stats::sd(y_original)
+  if (!is.finite(response_scale) || response_scale == 0) {
+    response_scale <- 1
+  }
+  y <- (y_original - response_center) / response_scale
+  sampling_variance <- sampling_variance_original / response_scale^2
   n_hidden <- .validate_positive_integer(n_hidden, "n_hidden")
+  if (!is.null(prior_beta_variance)) {
+    prior_beta_variance <- .validate_positive_scalar(
+      prior_beta_variance,
+      "prior_beta_variance"
+    )
+  }
+  prior_shape <- .validate_nonnegative_scalar(prior_shape, "prior_shape")
+  prior_rate <- .validate_nonnegative_scalar(prior_rate, "prior_rate")
   mcmc <- .validate_mcmc(n_iter, burn_in)
   n_iter <- mcmc$n_iter
   burn_in <- mcmc$burn_in
@@ -86,7 +114,8 @@ fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
   n <- length(y)
   p <- ncol(x)
   inv_sampling_variance <- 1 / sampling_variance
-  tau2 <- sig2b <- 1
+  tau2 <- 1
+  sig2b <- if (is.null(prior_beta_variance)) 1 else prior_beta_variance
   eta1 <- stats::rnorm(n)
   tau2_out <- sig2b_out <- rep(NA_real_, n_iter)
   beta1_out <- matrix(NA_real_, nrow = n_iter, ncol = n_hidden)
@@ -124,21 +153,26 @@ fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
 
     tau2 <- tau2_out[i] <- 1 / stats::rgamma(
       1,
-      0.1 + n / 2,
-      0.1 + t(theta - hidden_layer %*% beta1) %*%
+      prior_shape + n / 2,
+      prior_rate + t(theta - hidden_layer %*% beta1) %*%
         (theta - hidden_layer %*% beta1) / 2
     )
 
-    sig2b <- sig2b_out[i] <- 1 / stats::rgamma(
-      1,
-      20 + n_hidden / 2,
-      8 + sum(beta1^2) / 2
-    )
+    sig2b <- sig2b_out[i] <- if (is.null(prior_beta_variance)) {
+      1 / stats::rgamma(
+        1,
+        20 + n_hidden / 2,
+        8 + sum(beta1^2) / 2
+      )
+    } else {
+      prior_beta_variance
+    }
 
+    theta_original <- response_center + response_scale * theta
     ll[i] <- -2 * sum(stats::dnorm(
-      y,
-      mean = theta,
-      sd = sqrt(sampling_variance),
+      y_original,
+      mean = theta_original,
+      sd = sqrt(sampling_variance_original),
       log = TRUE
     ))
 
@@ -149,43 +183,41 @@ fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
 
   keep_cols <- .posterior_columns(n_iter, burn_in)
   keep_rows <- .posterior_rows(n_iter, burn_in)
+  predictions <- response_center + response_scale *
+    theta_out[, keep_cols, drop = FALSE]
+  mean <- response_center + response_scale *
+    xb_out[, keep_cols, drop = FALSE]
+  coefficients <- response_scale * beta1_out[keep_rows, , drop = FALSE]
+  random_effect_variance <- response_scale^2 * tau2_out[keep_rows]
+  coefficient_variance <- response_scale^2 * sig2b_out[keep_rows]
   dic <- 2 * mean(ll[keep_rows]) +
     2 * sum(stats::dnorm(
-      y,
-      mean = rowMeans(theta_out[, keep_cols, drop = FALSE]),
-      sd = sqrt(sampling_variance),
+      y_original,
+      mean = rowMeans(predictions),
+      sd = sqrt(sampling_variance_original),
       log = TRUE
     ))
 
   .new_nlfh_fit(
     c(
       list(
-      predictions = theta_out[, keep_cols, drop = FALSE],
-      random_effect_variance = tau2_out[keep_rows],
-      coefficient_variance = sig2b_out[keep_rows],
-      coefficients = beta1_out[keep_rows, , drop = FALSE],
-      mean = xb_out[, keep_cols, drop = FALSE],
+      predictions = predictions,
+      random_effect_variance = random_effect_variance,
+      coefficient_variance = coefficient_variance,
+      coefficients = coefficients,
+      mean = mean,
       dic = dic,
       method = "rnn",
       call = match.call(),
       n_iter = n_iter,
       burn_in = burn_in,
       n_hidden = n_hidden,
+      response_center = response_center,
+      response_scale = response_scale,
       progress = progress
       ),
       .fh_fit_metadata(input)
     ),
     "nlfh_rnn_fit"
-  )
-}
-
-FH_RNN_Fit <- function(Y, X, S2, nh = 200, iter = 1000, burn = 500) {
-  fit_fh_rnn(
-    y = Y,
-    X = X,
-    sampling_variance = S2,
-    n_hidden = nh,
-    n_iter = iter,
-    burn_in = burn
   )
 }

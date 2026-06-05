@@ -15,7 +15,9 @@
 #'
 #' * `method = "linear"`: the standard linear Fay-Herriot model.
 #' * `method = "rnn"`: a random-weight neural network Fay-Herriot extension for
-#'   nonlinear mean functions.
+#'   nonlinear mean functions. Non-intercept covariates are centered and scaled
+#'   by default, and the response is standardized internally before returned
+#'   quantities are transformed back to the original scale.
 #' * `method = "bart"`: a BART Fay-Herriot model for flexible nonlinear and
 #'   interaction effects. The first model-matrix column is treated as a
 #'   baseline/intercept column and is excluded from BART variable importance.

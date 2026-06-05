@@ -59,6 +59,10 @@ summary(fit_linear)
 The formula interface specifies the available predictors. For nonlinear methods,
 it does not impose an additive linear mean structure; the model estimates an
 unknown function of the model matrix.
+By default, the RNN model centers and scales non-intercept covariates before
+fitting; use `control = list(scale = FALSE)` to disable this covariate
+preprocessing. The RNN response and sampling variances are standardized
+internally and returned on the original response scale.
 
 ```{r nonlinear-example}
 fit_rnn <- fit_fh(

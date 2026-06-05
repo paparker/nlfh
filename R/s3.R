@@ -164,6 +164,9 @@ fitted.nlfh_fit <- function(object, statistic = c("mean", "median"),
   if (!is.null(x$n_bart_samples)) {
     fields <- c(fields, paste0("n_bart_samples = ", x$n_bart_samples))
   }
+  if (!is.null(x$scale)) {
+    fields <- c(fields, paste0("scale = ", x$scale))
+  }
   if (!is.null(x$progress)) {
     fields <- c(fields, paste0("progress = ", x$progress))
   }
@@ -356,6 +359,9 @@ print.summary.nlfh_fit <- function(x, digits = 4, max_rows = 6, ...) {
   }
   if (!is.null(x$progress)) {
     diagnostics$progress <- x$progress
+  }
+  if (!is.null(x$scale)) {
+    diagnostics$scale <- x$scale
   }
   if (!is.null(x$n_hidden)) {
     diagnostics$n_hidden <- x$n_hidden

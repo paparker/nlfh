@@ -34,9 +34,10 @@ for the linear Fay-Herriot model, \code{"rnn"} for the random-weight neural
 network Fay-Herriot model, and \code{"bart"} for the BART Fay-Herriot model.}
 
 \item{control}{Named list of control parameters. Common controls are
-\code{n_iter}, \code{burn_in}, and \code{progress}. Linear-specific control:
-\code{prior_beta_variance}. RNN-specific control: \code{n_hidden}. BART-specific
-controls: \code{prior_shape}, \code{prior_rate}, \code{n_bart_samples}, and \code{n_trees}.}
+\code{n_iter}, \code{burn_in}, \code{progress}, \code{scale}, \code{prior_shape}, and \code{prior_rate}.
+Linear-specific control: \code{prior_beta_variance}. RNN-specific controls:
+\code{n_hidden} and \code{prior_beta_variance}. BART-specific controls:
+\code{n_bart_samples} and \code{n_trees}.}
 
 \item{data}{Optional data frame containing variables used by \code{formula} and,
 optionally, \code{sampling_variance}.}
@@ -64,6 +65,13 @@ which is the default for formulas such as \code{y ~ x1 + x2}; use \verb{0 +} or 
 in the formula to omit it. Matrix inputs are used as supplied, so include an
 intercept column manually if one is desired.
 
+When \code{scale = TRUE}, non-intercept covariates are centered and scaled before
+fitting. The default is \code{TRUE} for \code{method = "rnn"} and \code{FALSE} for the
+linear and BART methods. For BART, the first baseline/intercept column is
+never scaled. The RNN method also standardizes the response and sampling
+variances internally, then transforms returned posterior quantities back to
+the original response scale.
+
 For \code{method = "rnn"} and \code{method = "bart"}, the formula identifies the
 predictors available to the nonlinear mean function. It does not impose an
 additive linear model. These methods estimate an unknown function \code{f(X)}, and
@@ -73,11 +81,11 @@ nonlinearities or interactions may be learned implicitly by the model.
 \code{y ~ .} expansion.
 
 For \code{method = "bart"}, the first column of the model matrix is treated as a
-baseline/intercept column. With the formula interface this is usually the
-default \code{(Intercept)} column. With the matrix interface, put the baseline or
-intercept column first. BART variable importance is computed only for the
-remaining columns, so \code{fit$variable_importance} does not include the first
-column.
+baseline/intercept column. With the formula interface, this must be the
+default \code{(Intercept)} column; formulas that omit the intercept with \verb{0 +} or
+\code{- 1} are rejected. With the matrix interface, put the baseline or intercept
+column first. BART variable importance is computed only for the remaining
+columns, so \code{fit$variable_importance} does not include the first column.
 }
 \examples{
 data(acs_dat)
@@ -123,4 +131,13 @@ fit_bart <- fit_fh(
 # The default formula intercept is the first model-matrix column and is not
 # included in BART variable importance.
 fit_bart$variable_importance
+}
+\references{
+Parker, P. A. (2024). Nonlinear Fay-Herriot Models for Small Area Estimation
+Using Random Weight Neural Networks. \emph{Journal of Official Statistics},
+40(2), 317-332. \doi{10.1177/0282423X241244671}
+
+Parker, P. A. and Eideh, A. (2026). BART-FH: Flexible Nonlinear Modeling for
+Small Area Estimation. \emph{Journal of Survey Statistics and Methodology},
+00, 1-18. \doi{10.1093/jssam/smaf050}
 }

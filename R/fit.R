@@ -25,12 +25,22 @@
 #'   for the linear Fay-Herriot model, `"rnn"` for the random-weight neural
 #'   network Fay-Herriot model, and `"bart"` for the BART Fay-Herriot model.
 #' @param control Named list of control parameters. Common controls are
-#'   `n_iter`, `burn_in`, and `progress`. Linear-specific control:
-#'   `prior_beta_variance`. RNN-specific control: `n_hidden`. BART-specific
-#'   controls: `prior_shape`, `prior_rate`, `n_bart_samples`, and `n_trees`.
+#'   `n_iter`, `burn_in`, `progress`, `scale`, `prior_shape`, and `prior_rate`.
+#'   Linear-specific control: `prior_beta_variance`. RNN-specific controls:
+#'   `n_hidden` and `prior_beta_variance`. BART-specific controls:
+#'   `n_bart_samples` and `n_trees`.
 #'
 #' @return An object inheriting from `nlfh_fit`. The first class identifies the
 #'   fitted method: `nlfh_linear_fit`, `nlfh_rnn_fit`, or `nlfh_bart_fit`.
+#'
+#' @references
+#' Parker, P. A. (2024). Nonlinear Fay-Herriot Models for Small Area Estimation
+#'   Using Random Weight Neural Networks. *Journal of Official Statistics*,
+#'   40(2), 317-332. \doi{10.1177/0282423X241244671}
+#'
+#' Parker, P. A. and Eideh, A. (2026). BART-FH: Flexible Nonlinear Modeling for
+#'   Small Area Estimation. *Journal of Survey Statistics and Methodology*,
+#'   00, 1-18. \doi{10.1093/jssam/smaf050}
 #'
 #' @details
 #' Formula inputs are parsed with [stats::model.frame()] and
@@ -39,6 +49,13 @@
 #' which is the default for formulas such as `y ~ x1 + x2`; use `0 +` or `- 1`
 #' in the formula to omit it. Matrix inputs are used as supplied, so include an
 #' intercept column manually if one is desired.
+#'
+#' When `scale = TRUE`, non-intercept covariates are centered and scaled before
+#' fitting. The default is `TRUE` for `method = "rnn"` and `FALSE` for the
+#' linear and BART methods. For BART, the first baseline/intercept column is
+#' never scaled. The RNN method also standardizes the response and sampling
+#' variances internally, then transforms returned posterior quantities back to
+#' the original response scale.
 #'
 #' For `method = "rnn"` and `method = "bart"`, the formula identifies the
 #' predictors available to the nonlinear mean function. It does not impose an
@@ -49,11 +66,11 @@
 #' `y ~ .` expansion.
 #'
 #' For `method = "bart"`, the first column of the model matrix is treated as a
-#' baseline/intercept column. With the formula interface this is usually the
-#' default `(Intercept)` column. With the matrix interface, put the baseline or
-#' intercept column first. BART variable importance is computed only for the
-#' remaining columns, so `fit$variable_importance` does not include the first
-#' column.
+#' baseline/intercept column. With the formula interface, this must be the
+#' default `(Intercept)` column; formulas that omit the intercept with `0 +` or
+#' `- 1` are rejected. With the matrix interface, put the baseline or intercept
+#' column first. BART variable importance is computed only for the remaining
+#' columns, so `fit$variable_importance` does not include the first column.
 #' @export
 #'
 #' @examples
@@ -116,19 +133,27 @@ fit_fh <- function(y = NULL, x = NULL, sampling_variance = NULL,
     },
     env = parent.frame()
   )
+  .validate_bart_formula_baseline(input, method)
 
   defaults <- switch(
     method,
     linear = list(
       prior_beta_variance = 10000^2,
+      prior_shape = 0.1,
+      prior_rate = 0.1,
       n_iter = 1000,
       burn_in = 500,
+      scale = FALSE,
       progress = TRUE
     ),
     rnn = list(
       n_hidden = 200,
+      prior_beta_variance = NULL,
+      prior_shape = 0.1,
+      prior_rate = 0.1,
       n_iter = 1000,
       burn_in = 500,
+      scale = TRUE,
       progress = TRUE
     ),
     bart = list(
@@ -138,6 +163,7 @@ fit_fh <- function(y = NULL, x = NULL, sampling_variance = NULL,
       burn_in = 500,
       n_bart_samples = 10,
       n_trees = 50,
+      scale = FALSE,
       progress = TRUE
     )
   )

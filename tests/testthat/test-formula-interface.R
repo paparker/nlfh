@@ -68,6 +68,36 @@ test_that("fit_fh dispatches all model families from formula inputs", {
   expect_s3_class(bart_fit, "nlfh_bart_fit")
 })
 
+test_that("BART formula interface requires an intercept", {
+  dat <- test_data()
+
+  expect_error(
+    fit_fh(
+      y ~ 0 + x1 + x2,
+      sampling_variance = vardir,
+      data = dat,
+      method = "bart",
+      control = small_control(n_bart_samples = 1, n_trees = 1)
+    ),
+    "requires a formula intercept",
+    fixed = TRUE
+  )
+  expect_error(
+    fit_fh_bart(
+      y ~ 0 + x1 + x2,
+      sampling_variance = vardir,
+      data = dat,
+      n_bart_samples = 1,
+      n_trees = 1,
+      n_iter = 4,
+      burn_in = 1,
+      progress = FALSE
+    ),
+    "requires a formula intercept",
+    fixed = TRUE
+  )
+})
+
 test_that("matrix interface still works", {
   dat <- test_data()
   X <- model.matrix(y ~ x1 + x2, dat)

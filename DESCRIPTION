@@ -1,6 +1,6 @@
 Package: nlfh
 Title: Nonlinear Fay-Herriot Models for Small Area Estimation
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: 
     person("Paul", "Parker", , "paulparker@ucsc.edu", role = c("aut", "cre"))
 Description: Fits nonlinear Bayesian extensions of the Fay-Herriot model for small
