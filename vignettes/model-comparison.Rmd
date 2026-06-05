@@ -83,7 +83,7 @@ fit_bart <- fit_fh(
 
 Smaller DIC values indicate better expected out-of-sample fit after accounting
 for model complexity. DIC is most useful as a relative comparison among models
-fit to the same response, areas, predictors, and sampling variances.
+fit to the same response, areas, predictors, and sampling variances. Note that in practice DIC may not be the best tool for model comparison, but is used here for illustration.
 
 ```{r compare-dic}
 fits <- list(
