@@ -195,6 +195,9 @@ parse_fh_inputs <- function(formula = NULL, data = NULL, y = NULL, x = NULL,
       sampling_variance_expr %in% names(data)) {
     return(data[[sampling_variance_expr]])
   }
+  if (!is.null(data)) {
+    return(eval(sampling_variance_expr, envir = data, enclos = env))
+  }
   eval(sampling_variance_expr, envir = env)
 }
 

@@ -75,6 +75,19 @@ method, the formula specifies the available predictors and does not impose an
 additive linear mean structure. The model estimates an unknown function
 \code{f(X)}.
 }
+\examples{
+data(acs_dat)
+acs_small <- as.data.frame(acs_dat[1:500, ])
+fit <- fit_fh_rnn(
+  MedInc ~ .,
+  sampling_variance = MedIncSE^2,
+  data = acs_small,
+  n_iter = 500,
+  burn_in = 250,
+  progress = FALSE
+)
+summary(fit)
+}
 \references{
 Parker, P. A. (2024). Nonlinear Fay-Herriot Models for Small Area Estimation
 Using Random Weight Neural Networks. \emph{Journal of Official Statistics},

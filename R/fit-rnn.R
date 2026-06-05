@@ -46,6 +46,19 @@
 #' additive linear mean structure. The model estimates an unknown function
 #' `f(X)`.
 #' @export
+#'
+#' @examples
+#' data(acs_dat)
+#' acs_small <- as.data.frame(acs_dat[1:500, ])
+#' fit <- fit_fh_rnn(
+#'   MedInc ~ .,
+#'   sampling_variance = MedIncSE^2,
+#'   data = acs_small,
+#'   n_iter = 500,
+#'   burn_in = 250,
+#'   progress = FALSE
+#' )
+#' summary(fit)
 fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
                        formula = NULL, data = NULL, X = NULL,
                        n_hidden = 200, n_iter = 1000, burn_in = 500,

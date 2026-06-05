@@ -48,23 +48,45 @@
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' x <- cbind(intercept = 1, z = rnorm(20))
-#' y <- rnorm(20)
-#' sampling_variance <- rep(0.2, 20)
+#' data(acs_dat)
+#' acs_small <- as.data.frame(acs_dat[1:500, ])
+#' example_control <- list(n_iter = 500, burn_in = 250, progress = FALSE)
 #'
-#' dat <- data.frame(y = y, x1 = x[, 2], sampling_variance = sampling_variance)
-#' fit_fh(y ~ x1, sampling_variance = sampling_variance, data = dat,
-#'        method = "linear")
-#' fit_fh(y = y, X = x, sampling_variance = sampling_variance,
-#'        method = "linear")
-#' fit_fh(y ~ ., sampling_variance = sampling_variance, data = dat,
-#'        method = "rnn", control = list(n_hidden = 50, n_iter = 2000))
-#' fit_fh(y, x, sampling_variance, method = "rnn",
-#'        control = list(n_hidden = 50, n_iter = 2000))
-#' fit_fh(y, x, sampling_variance, method = "bart",
-#'        control = list(n_trees = 25, n_bart_samples = 5))
-#' }
+#' fit_linear <- fit_fh(
+#'   MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian,
+#'   sampling_variance = MedIncSE^2,
+#'   data = acs_small,
+#'   method = "linear",
+#'   control = example_control
+#' )
+#'
+#' X <- model.matrix(
+#'   MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian,
+#'   data = acs_small
+#' )
+#' fit_matrix <- fit_fh(
+#'   y = acs_small$MedInc,
+#'   X = X,
+#'   sampling_variance = acs_small$MedIncSE^2,
+#'   method = "linear",
+#'   control = example_control
+#' )
+#'
+#' fit_rnn <- fit_fh(
+#'   MedInc ~ .,
+#'   sampling_variance = MedIncSE^2,
+#'   data = acs_small,
+#'   method = "rnn",
+#'   control = example_control
+#' )
+#'
+#' fit_bart <- fit_fh(
+#'   MedInc ~ SNAPRate + PovRate + White,
+#'   sampling_variance = MedIncSE^2,
+#'   data = acs_small,
+#'   method = "bart",
+#'   control = example_control
+#' )
 fit_fh <- function(y = NULL, x = NULL, sampling_variance = NULL,
                    method = c("linear", "rnn", "bart"), control = list(),
                    data = NULL, formula = NULL, X = NULL) {

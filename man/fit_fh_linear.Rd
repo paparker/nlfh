@@ -69,3 +69,16 @@ Formula inputs are parsed with \code{\link[stats:model.frame]{stats::model.frame
 dummy-variable rules. An intercept is included when the formula includes one,
 which is the default; matrix inputs are used as supplied.
 }
+\examples{
+data(acs_dat)
+acs_small <- as.data.frame(acs_dat[1:500, ])
+fit <- fit_fh_linear(
+  MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian,
+  sampling_variance = MedIncSE^2,
+  data = acs_small,
+  n_iter = 500,
+  burn_in = 250,
+  progress = FALSE
+)
+summary(fit)
+}

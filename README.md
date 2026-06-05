@@ -3,15 +3,18 @@
 
 # nlfh
 
-<!-- badges: start -->
-<!-- badges: end -->
+`nlfh` fits linear and nonlinear Bayesian Fay-Herriot models for small
+area estimation with area-level direct estimates and known sampling
+variances.
 
-The goal of nlfh is to …
+The main entry point is `fit_fh()`. Use `method = "linear"` for the
+standard linear Fay-Herriot model, `method = "rnn"` for the
+random-weight neural network extension, and `method = "bart"` for the
+BART-FH model.
 
 ## Installation
 
-You can install the development version of nlfh from
-[GitHub](https://github.com/) with:
+You can install the development version of nlfh from GitHub with:
 
 ``` r
 # install.packages("pak")
@@ -20,33 +23,79 @@ pak::pak("paparker/nlfh")
 
 ## Example
 
-This is a basic example which shows you how to solve a common problem:
+The included `acs_dat` data set contains a direct estimate of median
+income (`MedInc`), its standard error (`MedIncSE`), and area-level
+covariates. Pass the sampling variance separately as `MedIncSE^2`.
 
 ``` r
 library(nlfh)
-## basic example code
+
+data(acs_dat)
+acs_small <- as.data.frame(acs_dat[1:500, ])
+example_control <- list(n_iter = 500, burn_in = 250, progress = FALSE)
+
+fit_linear <- fit_fh(
+  MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian,
+  sampling_variance = MedIncSE^2,
+  data = acs_small,
+  method = "linear",
+  control = example_control
+)
+
+summary(fit_linear)
+#> <summary.nlfh_fit>
+#> Method: linear
+#> Iterations: 500
+#> Burn-in: 250
+#> DIC: 85203
+#> 
+#> Random-effect variance:
+#>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#>  0.4084  1.3760  2.3990  2.6473  3.7401  7.8430
 ```
 
-What is special about using `README.Rmd` instead of just `README.md`?
-You can include R chunks like so:
+The formula interface specifies the available predictors. For nonlinear
+methods, it does not impose an additive linear mean structure; the model
+estimates an unknown function of the model matrix.
 
 ``` r
-summary(cars)
-#>      speed           dist       
-#>  Min.   : 4.0   Min.   :  2.00  
-#>  1st Qu.:12.0   1st Qu.: 26.00  
-#>  Median :15.0   Median : 36.00  
-#>  Mean   :15.4   Mean   : 42.98  
-#>  3rd Qu.:19.0   3rd Qu.: 56.00  
-#>  Max.   :25.0   Max.   :120.00
+fit_rnn <- fit_fh(
+  MedInc ~ .,
+  sampling_variance = MedIncSE^2,
+  data = acs_small,
+  method = "rnn",
+  control = example_control
+)
+
+fit_bart <- fit_fh(
+  MedInc ~ SNAPRate + PovRate + White,
+  sampling_variance = MedIncSE^2,
+  data = acs_small,
+  method = "bart",
+  control = example_control
+)
+
+c(linear = fit_linear$dic, rnn = fit_rnn$dic, bart = fit_bart$dic)
+#>   linear      rnn     bart 
+#> 85202.62 22266.22 11761.98
 ```
 
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date. `devtools::build_readme()` is handy for this.
+You can also use the matrix interface directly.
 
-You can also embed plots, for example:
+``` r
+X <- model.matrix(
+  MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian,
+  data = acs_small
+)
 
-<img src="man/figures/README-pressure-1.png" width="100%" />
+fit_matrix <- fit_fh(
+  y = acs_small$MedInc,
+  X = X,
+  sampling_variance = acs_small$MedIncSE^2,
+  method = "linear",
+  control = example_control
+)
 
-In that case, don’t forget to commit and push the resulting figure
-files, so they display on GitHub and CRAN.
+dim(fit_matrix$predictions)
+#> [1] 500 250
+```

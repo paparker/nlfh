@@ -51,6 +51,19 @@
 #' additive linear mean structure. The BART mean component estimates an unknown
 #' function `f(X)`.
 #' @export
+#'
+#' @examples
+#' data(acs_dat)
+#' acs_small <- as.data.frame(acs_dat[1:500, ])
+#' fit <- fit_fh_bart(
+#'   MedInc ~ SNAPRate + PovRate + White,
+#'   sampling_variance = MedIncSE^2,
+#'   data = acs_small,
+#'   n_iter = 500,
+#'   burn_in = 250,
+#'   progress = FALSE
+#' )
+#' summary(fit)
 fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
                         formula = NULL, data = NULL, X = NULL,
                         prior_shape = 0.01, prior_rate = 0.01,
