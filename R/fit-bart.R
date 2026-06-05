@@ -12,7 +12,9 @@
 #' @param y Numeric vector of area-level direct estimates for the matrix
 #'   interface. If the first argument is a formula, it is treated as `formula`.
 #' @param x,X Numeric matrix or data frame of area-level covariates for the
-#'   matrix interface. Rows must correspond to entries of `y`.
+#'   matrix interface. Rows must correspond to entries of `y`. The first column
+#'   is treated as a baseline/intercept column and excluded from the BART
+#'   splitting variables and `variable_importance`.
 #' @param sampling_variance Numeric vector of known sampling variances for `y`.
 #'   With the formula interface, this may also be an unquoted column name from
 #'   `data` or a length-one character string naming a column in `data`.
@@ -49,8 +51,12 @@
 #' which is the default; matrix inputs are used as supplied. For this nonlinear
 #' method, the formula specifies the available predictors and does not impose an
 #' additive linear mean structure. The BART mean component estimates an unknown
-#' function `f(X)`.
-#' @export
+#' function `f(X)`. The first model-matrix column is treated as a
+#' baseline/intercept column. With the formula interface this is usually the
+#' default `(Intercept)` column; with the matrix interface, put the baseline or
+#' intercept column first. BART variable importance is computed only for the
+#' remaining columns.
+#' @noRd
 #'
 #' @examples
 #' data(acs_dat)
@@ -64,6 +70,7 @@
 #'   progress = FALSE
 #' )
 #' summary(fit)
+#' fit$variable_importance
 fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
                         formula = NULL, data = NULL, X = NULL,
                         prior_shape = 0.01, prior_rate = 0.01,
@@ -83,6 +90,7 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
   y <- input$y
   x <- input$X
   sampling_variance <- input$vardir
+  bart_x <- .bart_covariate_matrix(x)
   prior_shape <- .validate_nonnegative_scalar(prior_shape, "prior_shape")
   prior_rate <- .validate_nonnegative_scalar(prior_rate, "prior_rate")
   mcmc <- .validate_mcmc(n_iter, burn_in)
@@ -93,7 +101,6 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
   progress <- .validate_logical_scalar(progress, "progress")
 
   n <- length(y)
-  p <- ncol(x)
   u <- stats::rnorm(n, sd = 0.01)
   sigma_u2 <- 1
 
@@ -115,7 +122,7 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
 
   bart_sampler <- dbarts::dbarts(
     formula = y ~ .,
-    data = data.frame(y = y, x),
+    data = data.frame(y = y, bart_x),
     weights = 1 / sampling_variance,
     control = bart_control,
     verbose = FALSE
@@ -132,10 +139,7 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
     vc <- bart_fit$varcount
     vc_sum <- rowSums(vc)
     if (is.null(varcount_iter)) {
-      var_names <- rownames(vc)
-      if (is.null(var_names)) {
-        var_names <- colnames(x)[seq_along(vc_sum)]
-      }
+      var_names <- colnames(bart_x)[seq_along(vc_sum)]
       varcount_iter <- matrix(
         NA_real_,
         nrow = n_iter,
@@ -213,8 +217,6 @@ fit_fh_bart <- function(y = NULL, x = NULL, sampling_variance = NULL,
   )
 }
 
-#' @rdname fit_fh_bart
-#' @export
 BARTFH <- function(y, x, D, a = 0.01, b = 0.01, n.iter = 1000,
                    n.burn = 500, n.bart.samples = 10, n.tree = 50) {
   fit_fh_bart(
@@ -228,4 +230,15 @@ BARTFH <- function(y, x, D, a = 0.01, b = 0.01, n.iter = 1000,
     n_bart_samples = n.bart.samples,
     n_trees = n.tree
   )
+}
+
+.bart_covariate_matrix <- function(x) {
+  if (ncol(x) < 2L) {
+    stop(
+      "`method = \"bart\"` requires at least one covariate column after ",
+      "the first baseline/intercept column.",
+      call. = FALSE
+    )
+  }
+  x[, -1L, drop = FALSE]
 }

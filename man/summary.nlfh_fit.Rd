@@ -25,7 +25,8 @@ An object with classes \code{summary.nlfh_fit} and \code{summary}, containing:
 \item{areas}{Posterior summaries of area-level estimates \code{theta_i}.}
 \item{dic}{DIC, if available.}
 \item{variable_importance}{BART variable-importance proportions, if
-available.}
+available. The first model-matrix column is treated as a baseline/intercept
+column and is excluded.}
 }
 }
 \description{

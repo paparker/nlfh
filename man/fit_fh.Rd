@@ -21,7 +21,9 @@ interface.}
 
 \item{x, X}{Numeric matrix or data frame of area-level covariates for the
 matrix interface. Rows must correspond to entries of \code{y}. Include an
-intercept column if one is desired.}
+intercept column if one is desired. For \code{method = "bart"}, the first
+column is treated as a baseline/intercept column and is excluded from the
+BART splitting variables and \code{variable_importance}.}
 
 \item{sampling_variance}{Numeric vector of known sampling variances for \code{y}.
 With the formula interface, this may also be an unquoted column name from
@@ -69,6 +71,13 @@ nonlinearities or interactions may be learned implicitly by the model.
 \code{sampling_variance} is always supplied separately from the formula. When
 \code{sampling_variance} names a column in \code{data}, that column is excluded from
 \code{y ~ .} expansion.
+
+For \code{method = "bart"}, the first column of the model matrix is treated as a
+baseline/intercept column. With the formula interface this is usually the
+default \code{(Intercept)} column. With the matrix interface, put the baseline or
+intercept column first. BART variable importance is computed only for the
+remaining columns, so \code{fit$variable_importance} does not include the first
+column.
 }
 \examples{
 data(acs_dat)
@@ -110,4 +119,8 @@ fit_bart <- fit_fh(
   method = "bart",
   control = example_control
 )
+
+# The default formula intercept is the first model-matrix column and is not
+# included in BART variable importance.
+fit_bart$variable_importance
 }

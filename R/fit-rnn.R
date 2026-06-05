@@ -45,7 +45,7 @@
 #' method, the formula specifies the available predictors and does not impose an
 #' additive linear mean structure. The model estimates an unknown function
 #' `f(X)`.
-#' @export
+#' @noRd
 #'
 #' @examples
 #' data(acs_dat)
@@ -179,8 +179,6 @@ fit_fh_rnn <- function(y = NULL, x = NULL, sampling_variance = NULL,
   )
 }
 
-#' @rdname fit_fh_rnn
-#' @export
 FH_RNN_Fit <- function(Y, X, S2, nh = 200, iter = 1000, burn = 500) {
   fit_fh_rnn(
     y = Y,

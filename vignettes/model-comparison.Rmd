@@ -1,0 +1,198 @@
+---
+title: "Model comparison and posterior summaries"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Model comparison and posterior summaries}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 4
+)
+```
+
+This vignette shows a compact workflow for fitting several Fay-Herriot models,
+comparing them with DIC, and extracting posterior summaries. The example uses a
+small subset of the included ACS data so that the vignette builds quickly. For a
+substantive analysis, use more MCMC iterations and check convergence before
+interpreting model differences.
+
+```{r setup}
+library(nlfh)
+
+data(acs_dat)
+acs_small <- as.data.frame(acs_dat[1:80, ])
+
+fh_formula <- MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian
+sampling_variance <- acs_small$MedIncSE^2
+
+fit_control <- list(
+  n_iter = 120,
+  burn_in = 60,
+  progress = FALSE
+)
+```
+
+## Fit candidate models
+
+The linear model is the standard area-level Fay-Herriot model. The RNN and BART
+models use the same predictors, but estimate a nonlinear mean function. The RNN
+fit follows Parker (2024), and the BART-FH fit follows Parker and Eideh (2026).
+
+```{r fit-models}
+set.seed(1)
+
+fit_linear <- fit_fh(
+  formula = fh_formula,
+  sampling_variance = sampling_variance,
+  data = acs_small,
+  method = "linear",
+  control = fit_control
+)
+
+fit_rnn <- fit_fh(
+  formula = fh_formula,
+  sampling_variance = sampling_variance,
+  data = acs_small,
+  method = "rnn",
+  control = c(fit_control, list(n_hidden = 20))
+)
+
+fit_bart <- fit_fh(
+  formula = fh_formula,
+  sampling_variance = sampling_variance,
+  data = acs_small,
+  method = "bart",
+  control = c(fit_control, list(n_bart_samples = 3, n_trees = 10))
+)
+```
+
+## Compare DIC
+
+Smaller DIC values indicate better expected out-of-sample fit after accounting
+for model complexity. DIC is most useful as a relative comparison among models
+fit to the same response, areas, predictors, and sampling variances.
+
+```{r compare-dic}
+fits <- list(
+  linear = fit_linear,
+  rnn = fit_rnn,
+  bart = fit_bart
+)
+
+dic_table <- data.frame(
+  model = names(fits),
+  dic = vapply(fits, function(x) x$dic, numeric(1)),
+  row.names = NULL
+)
+dic_table <- dic_table[order(dic_table$dic), ]
+dic_table$delta_dic <- dic_table$dic - min(dic_table$dic)
+
+knitr::kable(dic_table, digits = 2)
+```
+
+## Inspect posterior summaries
+
+`summary()` returns a structured object with posterior summaries for available
+parameters. The printed summary is compact, while the list components can be
+used directly in downstream tables or plots.
+
+```{r summary-print}
+summary(fit_linear)
+```
+
+Variance parameter summaries are available for all three models. The RNN fit
+also has a coefficient-variance parameter for the random hidden-layer weights.
+
+```{r variance-summaries}
+variance_table <- do.call(
+  rbind,
+  lapply(names(fits), function(model) {
+    out <- summary(fits[[model]])$variance
+    out$model <- model
+    out[, c("model", "parameter", "mean", "sd", "median", "q2.5", "q97.5")]
+  })
+)
+
+knitr::kable(variance_table, digits = 2)
+```
+
+For BART fits, the first model-matrix column is treated as a
+baseline/intercept column and is excluded from variable importance. With the
+formula interface used here, that first column is the default `(Intercept)`, so
+the importance values correspond to the remaining covariates.
+
+```{r bart-variable-importance}
+knitr::kable(
+  data.frame(
+    variable = names(fit_bart$variable_importance),
+    importance = as.numeric(fit_bart$variable_importance)
+  ),
+  digits = 3
+)
+```
+
+For the linear model, coefficient summaries are stored in the `coefficients`
+component.
+
+```{r coefficient-summaries}
+linear_summary <- summary(fit_linear)
+knitr::kable(linear_summary$coefficients, digits = 2)
+```
+
+Area-level posterior summaries for `theta_i` are stored in the `areas`
+component. The same information is available from `fitted(..., full = TRUE)`.
+
+```{r area-summaries}
+area_summary <- fitted(fit_bart, full = TRUE)
+knitr::kable(head(area_summary, 8), digits = 2)
+```
+
+The posterior mean estimates can be compared with the direct estimates and their
+standard errors.
+
+```{r fitted-plot}
+plot(
+  acs_small$MedInc,
+  fitted(fit_bart),
+  xlab = "Direct estimate",
+  ylab = "Posterior mean of theta",
+  pch = 19,
+  col = "#2f6f8f"
+)
+abline(0, 1, col = "#9a3412", lwd = 2)
+```
+
+## Work with posterior draws
+
+Use `posterior_draws()` when simulations, custom summaries, or uncertainty
+propagation require the retained MCMC draws instead of summaries.
+
+```{r posterior-draws}
+theta_draws <- posterior_draws(fit_bart, variable = "theta")
+A_draws <- posterior_draws(fit_bart, variable = "A")
+
+dim(theta_draws)
+head(theta_draws[, 1:4])
+head(A_draws)
+```
+
+For model reporting, combine DIC with posterior summaries and model diagnostics.
+DIC ranks the fitted candidates in this example; the posterior summaries show
+the magnitude and uncertainty of the area-level estimates and variance
+components that drive those comparisons.
+
+## References
+
+Parker, P. A. (2024). Nonlinear Fay-Herriot Models for Small Area Estimation
+Using Random Weight Neural Networks. *Journal of Official Statistics*, 40(2),
+317-332. doi:10.1177/0282423X241244671
+
+Parker, P. A. and Eideh, A. (2026). BART-FH: Flexible Nonlinear Modeling for
+Small Area Estimation. *Journal of Survey Statistics and Methodology*, 00,
+1-18. doi:10.1093/jssam/smaf050

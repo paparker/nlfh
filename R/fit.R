@@ -15,7 +15,9 @@
 #'   interface.
 #' @param x,X Numeric matrix or data frame of area-level covariates for the
 #'   matrix interface. Rows must correspond to entries of `y`. Include an
-#'   intercept column if one is desired.
+#'   intercept column if one is desired. For `method = "bart"`, the first
+#'   column is treated as a baseline/intercept column and is excluded from the
+#'   BART splitting variables and `variable_importance`.
 #' @param sampling_variance Numeric vector of known sampling variances for `y`.
 #'   With the formula interface, this may also be an unquoted column name from
 #'   `data` or a length-one character string naming a column in `data`.
@@ -45,6 +47,13 @@
 #' `sampling_variance` is always supplied separately from the formula. When
 #' `sampling_variance` names a column in `data`, that column is excluded from
 #' `y ~ .` expansion.
+#'
+#' For `method = "bart"`, the first column of the model matrix is treated as a
+#' baseline/intercept column. With the formula interface this is usually the
+#' default `(Intercept)` column. With the matrix interface, put the baseline or
+#' intercept column first. BART variable importance is computed only for the
+#' remaining columns, so `fit$variable_importance` does not include the first
+#' column.
 #' @export
 #'
 #' @examples
@@ -87,6 +96,10 @@
 #'   method = "bart",
 #'   control = example_control
 #' )
+#'
+#' # The default formula intercept is the first model-matrix column and is not
+#' # included in BART variable importance.
+#' fit_bart$variable_importance
 fit_fh <- function(y = NULL, x = NULL, sampling_variance = NULL,
                    method = c("linear", "rnn", "bart"), control = list(),
                    data = NULL, formula = NULL, X = NULL) {

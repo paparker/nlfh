@@ -252,7 +252,8 @@ fitted.nlfh_fit <- function(object, statistic = c("mean", "median"),
 #'   \item{areas}{Posterior summaries of area-level estimates `theta_i`.}
 #'   \item{dic}{DIC, if available.}
 #'   \item{variable_importance}{BART variable-importance proportions, if
-#'   available.}
+#'   available. The first model-matrix column is treated as a baseline/intercept
+#'   column and is excluded.}
 #' }
 #' @export
 summary.nlfh_fit <- function(object, ...) {

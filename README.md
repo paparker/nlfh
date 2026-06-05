@@ -9,8 +9,9 @@ variances.
 
 The main entry point is `fit_fh()`. Use `method = "linear"` for the
 standard linear Fay-Herriot model, `method = "rnn"` for the
-random-weight neural network extension, and `method = "bart"` for the
-BART-FH model.
+random-weight neural network extension described by Parker (2024), and
+`method = "bart"` for the BART-FH model described by Parker and Eideh
+(2026).
 
 ## Installation
 
@@ -23,9 +24,10 @@ pak::pak("paparker/nlfh")
 
 ## Example
 
-The included `acs_dat` data set contains a direct estimate of median
-income (`MedInc`), its standard error (`MedIncSE`), and area-level
-covariates. Pass the sampling variance separately as `MedIncSE^2`.
+The included `acs_dat` data set contains 2021 direct estimates of median
+income (`MedInc`) for the state of Missouri, its standard error
+(`MedIncSE`), and area-level covariates. Pass the sampling variance
+separately as `MedIncSE^2`.
 
 ``` r
 library(nlfh)
@@ -44,14 +46,41 @@ fit_linear <- fit_fh(
 
 summary(fit_linear)
 #> <summary.nlfh_fit>
-#> Method: linear
-#> Iterations: 500
-#> Burn-in: 250
-#> DIC: 85203
+#> Model type: linear Fay-Herriot
+#> Formula: MedInc ~ SNAPRate + PovRate + White + Black + Hispanic + Asian
+#> DIC: 14154
 #> 
-#> Random-effect variance:
-#>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>  0.4084  1.3760  2.3990  2.6473  3.7401  7.8430
+#> MCMC:
+#>  n_iter burn_in posterior_draws areas
+#>     500     250             250   500
+#> 
+#> Details:
+#>  retained_draws burn_in_fraction progress
+#>             250              0.5    FALSE
+#> 
+#> Variance parameters:
+#>               parameter   mean     sd median   q2.5  q97.5
+#>  random_effect_variance 0.3876 0.2155 0.3202 0.1183 0.9157
+#> 
+#> Coefficients:
+#>    parameter    mean   sd  median    q2.5   q97.5
+#>  (Intercept)  104700 4432  105000   95720  113500
+#>     SNAPRate  -66560 3114  -66570  -72100  -59940
+#>      PovRate -139800 2006 -139900 -143800 -135800
+#>        White   -1505 4419   -1402   -9874    6982
+#>        Black  -10740 4320  -10500  -19040   -2147
+#>     Hispanic    4918 5566    5181   -5800   14970
+#> ... 1 more rows
+#> 
+#> Area-level estimates theta_i:
+#>  area  mean    sd median  q2.5 q97.5
+#>     1 43720 280.6  43720 43190 44270
+#>     2 30210 441.9  30210 29470 31020
+#>     3 44310 635.2  44270 43110 45620
+#>     4 61840 271.8  61820 61330 62360
+#>     5 64310 278.1  64300 63790 64860
+#>     6 40630 350.7  40640 39970 41280
+#> ... 494 more rows
 ```
 
 The formula interface specifies the available predictors. For nonlinear
@@ -77,8 +106,20 @@ fit_bart <- fit_fh(
 
 c(linear = fit_linear$dic, rnn = fit_rnn$dic, bart = fit_bart$dic)
 #>   linear      rnn     bart 
-#> 85202.62 22266.22 11761.98
+#> 14154.20 11669.31 11696.77
 ```
+
+``` r
+fit_bart$variable_importance
+#>  SNAPRate   PovRate     White 
+#> 0.3054538 0.3853294 0.3092167
+```
+
+For BART fits, the first model-matrix column is treated as a
+baseline/intercept column and is excluded from `variable_importance`.
+With the formula interface this is usually the default `(Intercept)`
+column; with the matrix interface, put the baseline or intercept column
+first.
 
 You can also use the matrix interface directly.
 
@@ -99,3 +140,13 @@ fit_matrix <- fit_fh(
 dim(fit_matrix$predictions)
 #> [1] 500 250
 ```
+
+## References
+
+Parker, P. A. (2024). Nonlinear Fay-Herriot Models for Small Area
+Estimation Using Random Weight Neural Networks. *Journal of Official
+Statistics*, 40(2), 317-332. <doi:10.1177/0282423X241244671>
+
+Parker, P. A. and Eideh, A. (2026). BART-FH: Flexible Nonlinear Modeling
+for Small Area Estimation. *Journal of Survey Statistics and
+Methodology*, 00, 1-18. <doi:10.1093/jssam/smaf050>

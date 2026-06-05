@@ -34,7 +34,7 @@
 #' [stats::model.matrix()]. Factors are expanded using R's standard contrast and
 #' dummy-variable rules. An intercept is included when the formula includes one,
 #' which is the default; matrix inputs are used as supplied.
-#' @export
+#' @noRd
 #'
 #' @examples
 #' data(acs_dat)
@@ -157,8 +157,6 @@ fit_fh_linear <- function(y = NULL, x = NULL, sampling_variance = NULL,
   )
 }
 
-#' @rdname fit_fh_linear
-#' @export
 FH_Fit <- function(Y, X, S2, sig2b = 10000^2, iter = 1000, burn = 500) {
   fit_fh_linear(
     y = Y,

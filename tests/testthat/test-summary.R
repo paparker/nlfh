@@ -81,6 +81,7 @@ test_that("summary.nlfh_fit handles BART fits without coefficient summaries", {
   expect_identical(out$diagnostics$n_trees, 1L)
   expect_identical(out$diagnostics$n_bart_samples, 1L)
   expect_false(is.null(out$variable_importance))
+  expect_identical(names(out$variable_importance), c("x1", "x2"))
 })
 
 test_that("print.summary.nlfh_fit prints a compact summary", {

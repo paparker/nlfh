@@ -38,35 +38,29 @@ test_that("formula interface works for nonlinear methods", {
   expect_identical(dim(bart_fit$predictions), c(12L, 3L))
 })
 
-test_that("method-specific exported functions accept formula inputs", {
+test_that("fit_fh dispatches all model families from formula inputs", {
   dat <- test_data()
 
-  linear_fit <- fit_fh_linear(
+  linear_fit <- fit_fh(
     y ~ x1 + x2,
     sampling_variance = vardir,
     data = dat,
-    n_iter = 4,
-    burn_in = 1,
-    progress = FALSE
+    method = "linear",
+    control = small_control()
   )
-  rnn_fit <- fit_fh_rnn(
+  rnn_fit <- fit_fh(
     y ~ x1 + x2,
     sampling_variance = vardir,
     data = dat,
-    n_hidden = 2,
-    n_iter = 4,
-    burn_in = 1,
-    progress = FALSE
+    method = "rnn",
+    control = small_control(n_hidden = 2)
   )
-  bart_fit <- fit_fh_bart(
+  bart_fit <- fit_fh(
     y ~ x1 + x2,
     sampling_variance = vardir,
     data = dat,
-    n_bart_samples = 1,
-    n_trees = 1,
-    n_iter = 4,
-    burn_in = 1,
-    progress = FALSE
+    method = "bart",
+    control = small_control(n_bart_samples = 1, n_trees = 1)
   )
 
   expect_s3_class(linear_fit, "nlfh_linear_fit")
